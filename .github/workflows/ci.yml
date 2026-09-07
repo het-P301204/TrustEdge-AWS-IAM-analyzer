@@ -256,7 +256,10 @@ jobs:
       - name: Analyse a fixture through the image, with no network
         run: |
           mkdir -p reports
-          docker run --rm --network none \
+          # The image runs as an unprivileged uid, so a host bind mount owned by
+          # the runner is not writable by it. Map the caller's uid/gid - the same
+          # thing a Linux user has to do.
+          docker run --rm --network none --user "$(id -u):$(id -g)" \
             -v "$PWD:/work" -w /work trustedge:ci \
             analyze --input fixtures/sample-account.json \
                     --output reports/docker-report.json --format json
@@ -266,7 +269,7 @@ jobs:
       - name: Exit codes survive the container boundary
         run: |
           set +e
-          docker run --rm --network none -v "$PWD:/work" -w /work trustedge:ci \
+          docker run --rm --network none --user "$(id -u):$(id -g)" -v "$PWD:/work" -w /work trustedge:ci \
             analyze -i fixtures/sample-account.json --fail-on critical --quiet > /dev/null
           code=$?
           set -e

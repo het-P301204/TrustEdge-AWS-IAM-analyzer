@@ -211,7 +211,11 @@ to end, and scans the repo for anything credential-shaped.
 
 ```bash
 docker build -t trustedge .
-docker run --rm --network none -v "$PWD:/work" -w /work trustedge \
+
+# --user matches the container uid to yours so it can write into a bind
+# mount. Needed on Linux; Docker Desktop handles it for you.
+docker run --rm --network none --user "$(id -u):$(id -g)" \
+  -v "$PWD:/work" -w /work trustedge \
   analyze -i fixtures/sample-account.json -o reports/report.md
 ```
 

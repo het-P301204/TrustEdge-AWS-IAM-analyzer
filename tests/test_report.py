@@ -238,15 +238,16 @@ class TestRenderDispatch:
         assert payload["summary"]["findings_total"] == len(sample_result.findings)
 
 
-class TestEmptyResultRendering:
-    @pytest.fixture(scope="class")
-    @classmethod
-    def empty_result(cls):
-        from trustedge import analyzer
-        from trustedge.parser import parse_export
+@pytest.fixture(scope="module")
+def empty_result():
+    from trustedge import analyzer
+    from trustedge.parser import parse_export
 
-        export, issues = parse_export({"account_id": "111122223333", "roles": []})
-        return analyzer.analyze(export, issues=issues)
+    export, issues = parse_export({"account_id": "111122223333", "roles": []})
+    return analyzer.analyze(export, issues=issues)
+
+
+class TestEmptyResultRendering:
 
     def test_markdown_says_nothing_was_found_without_implying_all_clear(
         self, empty_result

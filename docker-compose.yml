@@ -43,6 +43,8 @@ services:
   # the command, so:
   #   docker compose run --rm analyze -i /work/fixtures/sample-account.json \
   #                                   -o /work/reports/report.md
+  # On Linux add --user "$(id -u):$(id -g)" to `docker compose run` so the
+  # container can write into the bind mount. Docker Desktop handles it.
   analyze:
     build: .
     image: trustedge:local

@@ -40,6 +40,14 @@ COPY examples/ ./examples/
 
 # An IAM export is sensitive and this tool never needs privilege. Run as an
 # unprivileged user, and make /work the default place to mount host files.
+#
+# On Linux, writing a report into a bind-mounted host directory needs the
+# container uid to match yours, or the write is denied:
+#
+#   docker run --rm --network none --user "$(id -u):$(id -g)" \
+#     -v "$PWD:/work" -w /work trustedge analyze -i export.json -o out.md
+#
+# Docker Desktop on macOS and Windows handles this for you.
 RUN useradd --create-home --shell /usr/sbin/nologin --uid 10001 trustedge \
     && mkdir -p /work \
     && chown trustedge:trustedge /work

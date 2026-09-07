@@ -274,38 +274,39 @@ class TestInternalSuppression:
         assert by_role(included, "svc-internal-batch")
 
 
+@pytest.fixture(scope="module")
+def malformed_result(malformed_path):
+    return analyzer.analyze_file(malformed_path, include_internal=True)
+
+
 class TestMalformedFixtureEndToEnd:
-    @pytest.fixture(scope="class")
-    @classmethod
-    def result(cls, malformed_path):
-        return analyzer.analyze_file(malformed_path, include_internal=True)
 
-    def test_analysis_completes(self, result):
-        assert result.roles_analyzed >= 8
+    def test_analysis_completes(self, malformed_result):
+        assert malformed_result.roles_analyzed >= 8
 
-    def test_problems_are_reported_rather_than_hidden(self, result):
-        codes = {i.code for i in result.issues}
+    def test_problems_are_reported_rather_than_hidden(self, malformed_result):
+        codes = {i.code for i in malformed_result.issues}
         assert "trust_policy_unreadable" in codes
         assert "role_not_an_object" in codes
         assert "principal_key_unknown" in codes
 
-    def test_the_url_encoded_role_is_still_graded(self, result):
-        finding = one(result, "url-encoded-trust-policy")
+    def test_the_url_encoded_role_is_still_graded(self, malformed_result):
+        finding = one(malformed_result, "url-encoded-trust-policy")
         assert finding.blast_radius.tier == BlastRadiusTier.ADMIN
         assert finding.exposure.grade == ExposureGrade.WEAK
 
-    def test_the_good_statement_in_a_broken_policy_is_graded(self, result):
-        findings = by_role(result, "mixed-good-and-bad-statements")
+    def test_the_good_statement_in_a_broken_policy_is_graded(self, malformed_result):
+        findings = by_role(malformed_result, "mixed-good-and-bad-statements")
         assert any(f.exposure.grade == ExposureGrade.OPEN for f in findings)
 
-    def test_partial_wildcard_principal_is_reported_as_ungradable(self, result):
-        findings = by_role(result, "odd-principal-forms")
+    def test_partial_wildcard_principal_is_reported_as_ungradable(self, malformed_result):
+        findings = by_role(malformed_result, "odd-principal-forms")
         assert any(
             f.exposure.grade == ExposureGrade.NOT_DETERMINED for f in findings
         )
 
-    def test_not_principal_role_is_flagged_for_manual_review(self, result):
-        codes = {i.code for i in result.issues}
+    def test_not_principal_role_is_flagged_for_manual_review(self, malformed_result):
+        codes = {i.code for i in malformed_result.issues}
         assert "not_principal_unsupported" in codes
 
 
