@@ -12,60 +12,50 @@
 
 ## Data flow
 
+```mermaid
+flowchart TD
+    IN[/"export JSON<br/>file or POST body"/]
+
+    PA["<b>parser.py</b><br/>validate and normalise<br/>auto-detects authorization-details<br/>and routes it via convert.py<br/>emits ParseIssue for anything unreadable"]
+
+    CL["<b>classifier.py</b><br/>Principal element only<br/>PrincipalClass + ProviderKind"]
+    CO["<b>conditions.py</b><br/>Condition element<br/>ConditionSet, then KeyGuard:<br/>is this condition real?"]
+    PR["<b>providers/</b><br/>oidc - aws - saml - roles_anywhere<br/>ExposureAssessment"]
+
+    BR["<b>blast_radius.py</b><br/>inline + managed policies<br/>capabilities, then tier<br/>computed once per role"]
+
+    RK["<b>ranking.py</b><br/>exposure x blast radius<br/>risk, severity, explanation"]
+    AN["<b>analyzer.py</b><br/>orchestration, INTERNAL suppression,<br/>role summaries, global limitations"]
+
+    RP["<b>report.py</b><br/>JSON - Markdown - HTML"]
+    CI["<b>cli.py</b><br/>exit codes for CI"]
+    WB["<b>web.py</b><br/>loopback viewer"]
+
+    IN --> PA
+    PA -->|IamExport| CL
+    PA -->|IamExport| BR
+    CL -->|TrustPrincipal| CO
+    CO -->|GradingContext| PR
+    PR -->|ExposureAssessment| RK
+    BR -->|BlastRadius| RK
+    RK -->|"Finding[]"| AN
+    AN --> RP
+    AN --> CI
+    AN --> WB
+
+    style CL fill:#e7f1ff,stroke:#1a4f8b
+    style CO fill:#e7f1ff,stroke:#1a4f8b
+    style PR fill:#e7f1ff,stroke:#1a4f8b
+    style BR fill:#e8f5e9,stroke:#3d6b52
+    style RK fill:#fff3cd,stroke:#b3541e,stroke-width:2px
 ```
-                    export JSON (file, stdin-free, or POST body)
-                                  │
-        ┌─────────────────────────▼─────────────────────────┐
-        │ parser.py            validate + normalise         │
-        │   auto-detects get-account-authorization-details  │
-        │   and routes it through convert.py                │
-        │   emits ParseIssue for anything unreadable        │
-        └─────────────────────────┬─────────────────────────┘
-                                  │  IamExport
-              ┌───────────────────┴───────────────────┐
-              │                                       │
-   ┌──────────▼───────────┐              ┌────────────▼──────────────┐
-   │ classifier.py        │              │ blast_radius.py           │
-   │  Principal element   │              │  inline + managed policies│
-   │  → PrincipalClass    │              │  → capabilities → tier    │
-   │  → ProviderKind      │              │  (once per role)          │
-   └──────────┬───────────┘              └────────────┬──────────────┘
-              │  TrustPrincipal                       │  BlastRadius
-   ┌──────────▼───────────┐                           │
-   │ conditions.py        │                           │
-   │  Condition element   │                           │
-   │  → ConditionSet      │                           │
-   │  → KeyGuard (is this │                           │
-   │    condition real?)  │                           │
-   └──────────┬───────────┘                           │
-              │  GradingContext                       │
-   ┌──────────▼──────────────────────────┐            │
-   │ providers/                          │            │
-   │   oidc.py  aws.py  saml.py          │            │
-   │   roles_anywhere.py                 │            │
-   │  → ExposureAssessment               │            │
-   └──────────┬──────────────────────────┘            │
-              └───────────────┬──────────────────────-┘
-                              │
-                    ┌─────────▼──────────┐
-                    │ ranking.py         │
-                    │ exposure × blast   │
-                    │ → risk, severity,  │
-                    │   explanation      │
-                    └─────────┬──────────┘
-                              │  Finding[]
-                    ┌─────────▼──────────┐
-                    │ analyzer.py        │  orchestration, suppression,
-                    │ → AnalysisResult   │  role summaries, limitations
-                    └─────────┬──────────┘
-                              │
-        ┌─────────────────────┼─────────────────────┐
-   ┌────▼─────┐        ┌──────▼──────┐       ┌──────▼──────┐
-   │ report   │        │ cli.py      │       │ web.py      │
-   │ json/md/ │        │ exit codes  │       │ loopback    │
-   │ html     │        │ for CI      │       │ viewer      │
-   └──────────┘        └─────────────┘       └─────────────┘
-```
+
+The blue path answers *who is on the other side of the door*, reading only the
+`Principal` and `Condition` elements. The green path answers *what they get*,
+reading only the permission policies. They meet for the first time in
+`ranking.py`. That separation is the project's core claim, and there is a test
+asserting an admin role and a read-only role behind the identical trust policy
+receive the same exposure grade.
 
 ## Module responsibilities
 
