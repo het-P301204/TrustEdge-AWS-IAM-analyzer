@@ -150,6 +150,62 @@ day someone mistypes a path.
 
 ---
 
+## The input
+
+One JSON file. Only `roles` is required — everything else adds context, and the
+report says so when it's missing.
+
+```jsonc
+{
+  "account_id": "111122223333",
+  "roles": [{
+    "role_name": "gh-deploy",
+    "arn": "arn:aws:iam::111122223333:role/gh-deploy",
+
+    // the object being graded
+    "assume_role_policy_document": {
+      "Version": "2012-10-17",
+      "Statement": [{
+        "Effect": "Allow",
+        "Principal": { "Federated": "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com" },
+        "Action": "sts:AssumeRoleWithWebIdentity",
+        "Condition": { "StringLike": { "token.actions.githubusercontent.com:sub": "repo:acme/app:*" } }
+      }]
+    },
+
+    // resolved for blast radius
+    "inline_policies": [{ "policy_name": "p", "policy_document": { "Version": "2012-10-17", "Statement": [] } }],
+    "attached_managed_policies": [{ "policy_arn": "arn:aws:iam::aws:policy/AdministratorAccess" }]
+  }],
+
+  // documents for the attached policies above. A policy attached but absent
+  // from here gives blast radius UNKNOWN rather than LOW - absence of evidence
+  // is not evidence of absence.
+  "managed_policies": [{
+    "policy_arn": "arn:aws:iam::aws:policy/AdministratorAccess",
+    "policy_document": { "Version": "2012-10-17",
+                         "Statement": [{ "Effect": "Allow", "Action": "*", "Resource": "*" }] }
+  }],
+
+  // context AWS's own export can't give you. Operator assertions, labelled as
+  // such in every finding that uses them.
+  "oidc_providers":      [{ "url": "token.actions.githubusercontent.com" }],
+  "saml_providers":      [{ "name": "CorpDirectory" }],
+  "vendor_accounts":     { "444455556666": { "vendor": "Example Corp" } },
+  "trusted_account_ids": ["222233334444"]
+}
+```
+
+It's forgiving about shape, because real exports come from three different
+tools: `snake_case` or AWS `PascalCase` keys, policy documents as objects or
+JSON strings or URL-encoded strings, `Statement` as an object or a list,
+`Action` as a string or a list. Anything unreadable becomes a named issue in
+`input_issues` — never a crash, and never a silent drop.
+
+Full schema: **[docs/product.md](docs/product.md)**
+
+---
+
 ## How it works
 
 ```mermaid
@@ -225,16 +281,63 @@ Three real findings from that run:
 | `partner-admin-pinned`<br><sub>one role ARN plus a strong external ID</sub> | `STRONG` | `ADMIN` | 15 | 🟡 MEDIUM |
 | `public-status-reader`<br><sub>wildcard principal, but can only call `sts:GetCallerIdentity`</sub> | `OPEN` | `LOW` | 15 | 🟡 MEDIUM |
 
-Every finding carries:
+And here is the actual JSON for one of them — `gh-org-wide-secrets`, trimmed
+from the full record but otherwise verbatim:
 
-- **Who can get in**, in one sentence — *"Any GitHub Actions workflow, in any
-  GitHub organisation, that can request an OIDC token for this AWS account"*
-- **The verbatim trust statement**, so you can check the tool's work
-- **Named weak conditions**, each with the AWS documentation behind it
-- **The score as arithmetic you can redo by hand** —
-  `exposure OPEN (1.00) x blast radius ADMIN (1.00) = 100`
-- **A fix**, and a tightened policy when one can be written without guessing
-- **What the finding does *not* prove**
+```json
+{
+  "finding_id": "TE-gh-org-wide-secrets-S0-P0-arn-aws-iam-111122223333-oidc-pr",
+  "severity": "HIGH",
+  "risk_score": 56,
+  "score_explanation": "exposure WEAK (0.75) x blast radius HIGH (0.75) = 56, which falls in the HIGH band",
+  "principal_classification": "oidc",
+  "provider": "github_actions",
+
+  "exposure": {
+    "grade": "WEAK",
+    "rubric": "oidc.github_actions",
+    "confidence": "high",
+    "who_can_assume": "Any workflow in any repository of GitHub organisation acme-corp",
+    "weak_conditions": [{
+      "code": "github_mutable_identifiers_only",
+      "key": "token.actions.githubusercontent.com:sub",
+      "vacuous": false,
+      "detail": "Access is pinned only by name-based claims (sub). AWS documents that GitHub repository, organisation and user names can change, and \"a name that is freed by renaming or deletion can be claimed by a different account\". Add an immutable identifier such as repository_owner_id, repository_id or actor_id so a renamed or deleted org cannot be impersonated."
+    }],
+    "references": ["https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-idp_oidc.html", "..."]
+  },
+
+  "blast_radius": {
+    "tier": "HIGH",
+    "admin_equivalent": false,
+    "statements_evaluated": 1,
+    "capabilities": [
+      { "category": "data_plane", "code": "secrets_read",
+        "action_pattern": "secretsmanager:GetSecretValue", "resource_patterns": ["*"] },
+      { "category": "data_plane", "code": "kms_decrypt",
+        "action_pattern": "kms:Decrypt", "resource_patterns": ["*"] }
+    ]
+  },
+
+  "evidence": {
+    "trust_statement": { "...": "the statement verbatim, so you can check the grade" },
+    "conditions_parsed": { "...": "operator -> key -> values, normalised" },
+    "condition_keys_seen": ["token.actions.githubusercontent.com:aud",
+                            "token.actions.githubusercontent.com:sub"]
+  },
+
+  "recommendation": { "summary": "...", "tightened_trust_policy": null }
+}
+```
+
+Note `"tightened_trust_policy": null`. TrustEdge only emits a rewritten policy
+when it can do so **without inventing a value** — here it knows the org but not
+which repositories you meant to trust, so it explains that in prose instead of
+guessing.
+
+The report is versioned (`"schema": "trustedge.report/1"`) with a `summary`,
+`findings`, per-role `roles` inventory, `input_issues` and `limitations` at the
+top level.
 
 ---
 
@@ -255,6 +358,40 @@ Every finding carries:
 data-plane reach — and reads combinations. `iam:PassRole` alone is MODERATE;
 paired with something that *runs code* it's HIGH, because passing a role only
 becomes code execution when there's something to execute it.
+
+---
+
+## Every check it makes
+
+**35 exposure weaknesses**, each with the AWS documentation behind it:
+
+| Group | Codes |
+|---|---|
+| **Condition mechanics**<br><sub>provider-independent</sub> | `if_exists_vacuous` `forallvalues_vacuous` `negated_operator_only` `wildcard_only_value` `literal_wildcard_in_exact_operator` `null_requires_absent` `unreadable_condition_value` `if_exists_redundant` |
+| **OIDC / CI federation** | `github_tenancy_not_pinned` `github_sub_org_not_pinned` `github_mutable_identifiers_only` `shared_issuer_tenancy_claim_missing` `private_issuer_subject_missing` `oidc_aud_not_pinned` `undocumented_condition_key` |
+| **EKS IRSA** | `irsa_subject_missing` `irsa_subject_not_pinned` `irsa_audience_missing` |
+| **Cross-account** | `external_id_missing` `external_id_weak_value` |
+| **Wildcard principal** | `wildcard_principal_unconditioned` `wildcard_principal_external_id_only` `wildcard_principal_contextual_conditions_only` |
+| **AWS service** | `service_principal_no_source_condition` `source_condition_too_broad` `cognito_role_without_condition` |
+| **SAML** | `saml_no_conditions` `saml_no_subject_condition` `saml_aud_wildcard` |
+| **Roles Anywhere** | `roles_anywhere_unconditioned` `roles_anywhere_trust_anchor_not_pinned` `roles_anywhere_identity_not_pinned` `roles_anywhere_trust_anchor_wildcarded` `roles_anywhere_certificate_pattern_broad` `roles_anywhere_source_arn_wrong_service` |
+
+`vacuous: true` marks the subset that makes a condition enforce *nothing* —
+that's the flag to filter on if you're consuming the JSON.
+
+**44 blast-radius probes** — 29 escalation primitives, 15 data-plane — plus
+four derived codes: `admin_equivalent`, `admin_via_iam_control`,
+`passrole_plus_compute`, `create_role_plus_policy`, and a
+`service_wildcard_<service>` code per service-wide wildcard.
+
+**26 OIDC issuers** in the registry: 22 from AWS's own shared-provider table
+with the tenancy claim each one requires, plus 4 obviously multi-tenant ones
+AWS hasn't catalogued. Findings record which list a decision came from.
+
+**17 compute-attachment service principals** carved out so `ec2`, `lambda`,
+`ecs-tasks`, `pods.eks` and friends aren't flagged for a missing
+confused-deputy condition. It's a named table with a per-entry justification,
+not a heuristic, so you can argue with it.
 
 ---
 
@@ -280,6 +417,29 @@ fails the build if an unsourced statistic ever shows up in the docs.
 
 ---
 
+## How it differs from what you already run
+
+TrustEdge is **not a new security primitive.** Every signal it uses is
+documented, and most are available elsewhere. What's new is the combination.
+
+| Tool | Answers | Doesn't |
+|---|---|---|
+| **IAM Access Analyzer** | Is this role reachable from outside my zone of trust? Automated reasoning, live, 15 resource types | Grade *how strong* the condition is, resolve blast radius, or rank the two together. Needs enabling, and analyses external access only in the Region it's enabled in |
+| **PMapper** | Who *inside* my account can become who else? Escalation graphs | Inbound trust from outside — which is the only thing TrustEdge looks at |
+| **Cloudsplaining** | Are my *permission* policies over-privileged? | Trust policies. Different document, different question |
+| **ScoutSuite / Prowler / Steampipe** | Hundreds of posture checks, broad coverage | Provider-aware condition grading, or pairing a trust finding with blast radius |
+| **TrustEdge** | How strong is each inbound door, and what's behind it — ranked | Anything live. It reads a file |
+
+Concretely: Access Analyzer will tell you `gh-legacy-admin` is externally
+accessible. It won't tell you the reason is a missing `sub` condition on a
+*shared* issuer, that the same omission on your EKS role is far less serious,
+or that this particular role happens to hold `AdministratorAccess` so it should
+be first in your queue.
+
+Run Access Analyzer. Then run this on the export.
+
+---
+
 ## Docs
 
 | | |
@@ -297,12 +457,50 @@ fails the build if an unsourced statistic ever shows up in the docs.
 
 ```bash
 pip install -e ".[dev]"
-pytest                       # 601 tests
+pytest                       # 601 tests, ~1.5s
 ```
 
+```
+src/trustedge/
+  policy.py         IAM globs, ARN parsing, policy-document coercion
+  conditions.py     is this condition a guard, or decoration?
+  parser.py         validation and diagnostics; the only module that rejects input
+  classifier.py     Principal -> class + provider kind (nothing else)
+  providers/
+    oidc.py         shared/private issuer registry, GitHub, IRSA, Cognito
+    aws.py          cross-account, wildcard, service principals, external IDs
+    saml.py  roles_anywhere.py
+  blast_radius.py   capability detection and tiering
+  ranking.py        exposure x blast, severity bands, deterministic sort
+  analyzer.py       orchestration
+  report.py         JSON / Markdown / self-contained HTML
+  convert.py        get-account-authorization-details -> export
+  web.py  cli.py
+```
+
+Tests are weighted towards the parts where a mistake is silent:
+
+| | | | |
+|---|--:|---|--:|
+| `test_policy.py` | 72 | `test_cli.py` | 39 |
+| `test_providers_oidc.py` | 70 | `test_conditions.py` | 37 |
+| `test_blast_radius.py` | 63 | `test_report.py` | 36 |
+| `test_providers_aws.py` | 58 | `test_classifier.py` | 31 |
+| `test_parser.py` | 49 | `test_ranking.py` | 30 |
+| `test_analyzer.py` | 48 | `test_convert.py` | 22 |
+| | | `test_web.py` · `saml` · `roles_anywhere` | 46 |
+
+They drive the real pipeline — a helper builds an export dict, runs it through
+`parse_export` and `analyze`, and asserts on the finding. Assertions are
+written against *AWS semantics* ("an `IfExists` condition on an optional claim
+does not guard") rather than against return values, so a failing test tells you
+whether a rubric change was actually wrong.
+
 Standard library only — zero runtime dependencies, so it runs air-gapped. CI
-runs the suite on Python 3.9 through 3.13, byte-compiles every module, drives
-the CLI end to end, and scans the repo for anything credential-shaped.
+runs the suite on Python 3.9 through 3.13, byte-compiles every module, asserts
+the dependency count is still zero, drives the CLI end to end including every
+exit code, checks the report is byte-identical across two runs, boots the
+viewer, builds the image, and scans the repo for anything credential-shaped.
 
 ```bash
 docker build -t trustedge .
