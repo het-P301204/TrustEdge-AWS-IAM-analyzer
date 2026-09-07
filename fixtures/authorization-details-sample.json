@@ -1,0 +1,124 @@
+{
+  "_note": [
+    "SYNTHETIC DATA shaped like the output of:",
+    "    aws iam get-account-authorization-details --filter Role",
+    "",
+    "Used to exercise 'trustedge convert' and the auto-detection in the parser.",
+    "Note what this shape does NOT contain: IAM OIDC/SAML identity providers, the",
+    "organisation id, and any record of which vendor owns an external account.",
+    "Supply those with 'trustedge convert --add fixtures/context-supplement.json'."
+  ],
+  "RoleDetailList": [
+    {
+      "Path": "/",
+      "RoleName": "gh-deploy-from-authdetails",
+      "RoleId": "AROAEXAMPLEID0000001",
+      "Arn": "arn:aws:iam::111122223333:role/gh-deploy-from-authdetails",
+      "CreateDate": "2025-11-02T11:22:33+00:00",
+      "AssumeRolePolicyDocument": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "Principal": {
+              "Federated": "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com"
+            },
+            "Action": "sts:AssumeRoleWithWebIdentity",
+            "Condition": {
+              "StringLike": {
+                "token.actions.githubusercontent.com:sub": "repo:acme-corp/*"
+              }
+            }
+          }
+        ]
+      },
+      "InstanceProfileList": [],
+      "RolePolicyList": [
+        {
+          "PolicyName": "inline-pass-role",
+          "PolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": ["iam:PassRole", "ec2:RunInstances"],
+                "Resource": "*"
+              }
+            ]
+          }
+        }
+      ],
+      "AttachedManagedPolicies": [
+        {
+          "PolicyName": "SyntheticAdmin",
+          "PolicyArn": "arn:aws:iam::111122223333:policy/SyntheticAdmin"
+        }
+      ],
+      "Tags": [{ "Key": "owner", "Value": "platform" }],
+      "RoleLastUsed": { "LastUsedDate": "2026-08-30T04:05:06+00:00", "Region": "us-east-1" }
+    },
+    {
+      "Path": "/service-role/",
+      "RoleName": "lambda-from-authdetails",
+      "RoleId": "AROAEXAMPLEID0000002",
+      "Arn": "arn:aws:iam::111122223333:role/service-role/lambda-from-authdetails",
+      "CreateDate": "2024-06-01T00:00:00+00:00",
+      "AssumeRolePolicyDocument": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "Principal": { "Service": "lambda.amazonaws.com" },
+            "Action": "sts:AssumeRole"
+          }
+        ]
+      },
+      "InstanceProfileList": [],
+      "RolePolicyList": [],
+      "AttachedManagedPolicies": [],
+      "PermissionsBoundary": {
+        "PermissionsBoundaryType": "Policy",
+        "PermissionsBoundaryArn": "arn:aws:iam::111122223333:policy/DeveloperBoundary"
+      },
+      "Tags": []
+    }
+  ],
+  "Policies": [
+    {
+      "PolicyName": "SyntheticAdmin",
+      "PolicyId": "ANPAEXAMPLEID0000001",
+      "Arn": "arn:aws:iam::111122223333:policy/SyntheticAdmin",
+      "Path": "/",
+      "DefaultVersionId": "v2",
+      "AttachmentCount": 1,
+      "IsAttachable": true,
+      "PolicyVersionList": [
+        {
+          "Document": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": ["s3:GetObject"],
+                "Resource": "arn:aws:s3:::only-this-bucket/*"
+              }
+            ]
+          },
+          "VersionId": "v1",
+          "IsDefaultVersion": false,
+          "CreateDate": "2024-01-01T00:00:00+00:00"
+        },
+        {
+          "Document": {
+            "Version": "2012-10-17",
+            "Statement": [{ "Effect": "Allow", "Action": "*", "Resource": "*" }]
+          },
+          "VersionId": "v2",
+          "IsDefaultVersion": true,
+          "CreateDate": "2025-01-01T00:00:00+00:00"
+        }
+      ]
+    }
+  ],
+  "IsTruncated": false
+}

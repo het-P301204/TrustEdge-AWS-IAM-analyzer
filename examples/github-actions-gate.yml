@@ -1,0 +1,150 @@
+# Example: gate a pull request on trust-boundary regressions.
+#
+# Copy this into your own repository as .github/workflows/trust-boundary.yml.
+#
+# WHAT THIS DOES
+#   Assumes a read-only role, exports IAM role state, and fails the build if
+#   TrustEdge finds anything at HIGH or above. The export is deliberately not
+#   uploaded as an artifact by default - see the note at the bottom.
+#
+# WHAT IT DOES NOT DO
+#   TrustEdge never calls AWS. The AWS CLI step below is yours: you choose the
+#   role, you choose the permissions, and the export lands on the runner. The
+#   analysis itself needs no credentials at all, so you can also run it on an
+#   export produced somewhere else entirely.
+#
+# THE IAM PERMISSIONS THIS NEEDS (read-only):
+#   iam:GetAccountAuthorizationDetails
+#   iam:ListOpenIDConnectProviders
+#   iam:GetOpenIDConnectProvider
+#   iam:ListSAMLProviders
+
+name: Trust boundary
+
+on:
+  pull_request:
+  schedule:
+    # Trust policies decay through change elsewhere, so check on a timer too.
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  id-token: write # for the OIDC assume below
+  contents: read
+
+jobs:
+  trust-boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install TrustEdge
+        run: python -m pip install trustedge
+
+      # Pin this to a role whose own trust policy TrustEdge would grade STRONG:
+      # a specific repository and a specific ref. Practise what the tool
+      # preaches.
+      - name: Assume the read-only audit role
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.TRUSTEDGE_AUDIT_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Export IAM role state
+        run: |
+          aws iam get-account-authorization-details --filter Role > auth-details.json
+
+          # get-account-authorization-details does not return identity
+          # providers, so collect them separately and build the supplement.
+          aws iam list-open-id-connect-providers > oidc-list.json
+          aws iam list-saml-providers > saml-list.json
+          python - <<'PY'
+          import json, subprocess
+
+          oidc = []
+          for entry in json.load(open("oidc-list.json"))["OpenIDConnectProviderList"]:
+              arn = entry["Arn"]
+              detail = json.loads(subprocess.check_output([
+                  "aws", "iam", "get-open-id-connect-provider",
+                  "--open-id-connect-provider-arn", arn,
+                  "--output", "json",
+              ]))
+              oidc.append({
+                  "arn": arn,
+                  "url": detail["Url"],
+                  "client_id_list": detail.get("ClientIDList", []),
+              })
+
+          saml = [
+              {"arn": p["Arn"], "name": p["Arn"].split("/")[-1]}
+              for p in json.load(open("saml-list.json"))["SAMLProviderList"]
+          ]
+
+          # Fill these in for your organisation. They are assertions you make,
+          # not things TrustEdge verifies - and they can only make a finding
+          # less alarming, so keep them accurate.
+          json.dump({
+              "oidc_providers": oidc,
+              "saml_providers": saml,
+              "organization_id": "o-EXAMPLE",
+              "trusted_account_ids": [],
+              "vendor_accounts": {},
+          }, open("context.json", "w"), indent=2)
+          PY
+
+      - name: Convert and analyse
+        run: |
+          trustedge convert -i auth-details.json --add context.json -o export.json
+          trustedge validate -i export.json
+          trustedge analyze -i export.json -o trustedge-report.md   -f markdown
+          trustedge analyze -i export.json -o trustedge-report.json -f json
+
+      # Post the report on the pull request so a reviewer sees it without
+      # digging through logs. Requires `pull-requests: write`.
+      - name: Summarise in the job output
+        if: always()
+        run: |
+          {
+            echo "## TrustEdge inbound trust boundary"
+            echo
+            python -c "
+          import json
+          d = json.load(open('trustedge-report.json'))
+          s = d['summary']
+          print('| Metric | Value |'); print('|---|---|')
+          print('| Roles analysed |', s['roles_analyzed'], '|')
+          print('| Findings |', s['findings_total'], '|')
+          print('| Highest severity |', s['highest_severity'] or 'none', '|')
+          print()
+          print('| Severity | Count |'); print('|---|---|')
+          for k, v in s['severity_counts'].items():
+              print('|', k, '|', v, '|')
+          print()
+          for f in d['findings'][:5]:
+              print('- **%s** (%d) \`%s\` - %s' % (
+                  f['severity'], f['risk_score'], f['role_name'],
+                  f['exposure']['who_can_assume']))
+          "
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail on HIGH or above
+        run: trustedge analyze -i export.json --fail-on high --quiet
+
+      # DO NOT upload auth-details.json or export.json as artifacts. They are
+      # a complete map of who can do what in the account, and workflow
+      # artifacts are readable by anyone with repository read access. The
+      # report is derived and much less sensitive, but it still quotes role
+      # names and policy documents - keep the retention short and think about
+      # who can read it.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trustedge-report
+          path: |
+            trustedge-report.md
+            trustedge-report.json
+          retention-days: 5

@@ -1,0 +1,12 @@
+# Normalise to LF in the repository. The CI workflow uses bash heredocs and the
+# Dockerfile is built on Linux; CRLF in either breaks them.
+* text=auto eol=lf
+
+# Keep fixtures byte-stable so report output stays reproducible across
+# platforms.
+*.json text eol=lf
+*.py   text eol=lf
+*.md   text eol=lf
+*.yml  text eol=lf
+*.toml text eol=lf
+Dockerfile text eol=lf

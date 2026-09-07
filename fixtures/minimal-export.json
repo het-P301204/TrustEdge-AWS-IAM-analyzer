@@ -1,0 +1,41 @@
+{
+  "_note": "SYNTHETIC DATA. The smallest export TrustEdge accepts, for smoke tests and as a starting template.",
+  "trustedge_export_version": "1",
+  "account_id": "111122223333",
+  "roles": [
+    {
+      "role_name": "example-role",
+      "arn": "arn:aws:iam::111122223333:role/example-role",
+      "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "Principal": { "AWS": "arn:aws:iam::444455556666:root" },
+            "Action": "sts:AssumeRole",
+            "Condition": {
+              "StringEquals": {
+                "sts:ExternalId": "EXAMPLE-4c1b9ad72fe6835019bd"
+              }
+            }
+          }
+        ]
+      },
+      "inline_policies": [
+        {
+          "policy_name": "read-one-bucket",
+          "policy_document": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": "s3:GetObject",
+                "Resource": "arn:aws:s3:::example-bucket/*"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

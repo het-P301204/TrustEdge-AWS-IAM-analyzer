@@ -1,0 +1,41 @@
+{
+  "_note": [
+    "SYNTHETIC DATA. Operator-supplied context that",
+    "'aws iam get-account-authorization-details' cannot give you.",
+    "",
+    "Merge it into a converted export with:",
+    "    trustedge convert -i auth.json --add fixtures/context-supplement.json -o export.json",
+    "",
+    "Everything in here is an ASSERTION BY YOU, not something TrustEdge checks.",
+    "Findings that use vendor_accounts say so explicitly: TrustEdge never verifies",
+    "that an AWS account is still owned or operated by the named vendor.",
+    "",
+    "Collect the provider lists with read-only calls:",
+    "    aws iam list-open-id-connect-providers",
+    "    aws iam get-open-id-connect-provider --open-id-connect-provider-arn <arn>",
+    "    aws iam list-saml-providers"
+  ],
+  "account_id": "111122223333",
+  "organization_id": "o-exampleorgid",
+  "trusted_account_ids": ["222233334444", "333344445555"],
+  "oidc_providers": [
+    {
+      "arn": "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com",
+      "url": "token.actions.githubusercontent.com",
+      "client_id_list": ["sts.amazonaws.com"]
+    }
+  ],
+  "saml_providers": [
+    {
+      "arn": "arn:aws:iam::111122223333:saml-provider/CorpDirectory",
+      "name": "CorpDirectory"
+    }
+  ],
+  "vendor_accounts": {
+    "444455556666": {
+      "vendor": "Example Corp",
+      "notes": "Cost optimisation SaaS; contract renewed 2026-01.",
+      "requires_external_id": true
+    }
+  }
+}

@@ -1,0 +1,243 @@
+{
+  "_note": [
+    "SYNTHETIC DATA. Scenario 18: malformed and incomplete input.",
+    "",
+    "Every role in this file breaks the export contract in a different way. The",
+    "whole point is that TrustEdge must not crash, must not silently skip data,",
+    "and must still analyse the roles that ARE readable. Run:",
+    "",
+    "    trustedge validate --input fixtures/malformed-export.json",
+    "",
+    "and every problem below should appear as a named issue."
+  ],
+  "trustedge_export_version": "1",
+  "account_id": "111122223333",
+
+  "managed_policies": [
+    {
+      "policy_arn": "arn:aws:iam::111122223333:policy/Broken",
+      "policy_name": "Broken",
+      "policy_document": "this is not json"
+    },
+    {
+      "policy_name": "NoArnSoNoRoleCanReferenceIt",
+      "policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [{ "Effect": "Allow", "Action": "*", "Resource": "*" }]
+      }
+    },
+    "a bare string where an object was expected"
+  ],
+
+  "oidc_providers": [
+    { "client_id_list": ["sts.amazonaws.com"] },
+    42
+  ],
+
+  "vendor_accounts": {
+    "not-an-account-id": { "vendor": "Nope" },
+    "444455556666": "Example Corp"
+  },
+
+  "roles": [
+    {
+      "_problem": "Trust policy is a URL-encoded JSON string, as returned by get-role. Must still parse.",
+      "role_name": "url-encoded-trust-policy",
+      "arn": "arn:aws:iam::111122223333:role/url-encoded-trust-policy",
+      "assume_role_policy_document": "%7B%22Version%22%3A%222012-10-17%22%2C%22Statement%22%3A%5B%7B%22Effect%22%3A%22Allow%22%2C%22Principal%22%3A%7B%22AWS%22%3A%22arn%3Aaws%3Aiam%3A%3A444455556666%3Aroot%22%7D%2C%22Action%22%3A%22sts%3AAssumeRole%22%7D%5D%7D",
+      "inline_policies": [
+        {
+          "policy_name": "Admin",
+          "policy_document": {
+            "Version": "2012-10-17",
+            "Statement": [{ "Effect": "Allow", "Action": "*", "Resource": "*" }]
+          }
+        }
+      ]
+    },
+
+    {
+      "_problem": "No trust policy at all.",
+      "role_name": "no-trust-policy",
+      "arn": "arn:aws:iam::111122223333:role/no-trust-policy"
+    },
+
+    {
+      "_problem": "Trust policy is valid JSON but not a policy document.",
+      "role_name": "trust-policy-not-a-policy",
+      "arn": "arn:aws:iam::111122223333:role/trust-policy-not-a-policy",
+      "assume_role_policy_document": { "hello": "world" }
+    },
+
+    {
+      "_problem": "Trust policy string is not JSON.",
+      "role_name": "trust-policy-garbage",
+      "arn": "arn:aws:iam::111122223333:role/trust-policy-garbage",
+      "assume_role_policy_document": "{not json at all"
+    },
+
+    {
+      "_problem": "One good statement, one that is a string, one with a non-object Condition, one with a bad Effect, one with no Principal. The good one must still be graded.",
+      "role_name": "mixed-good-and-bad-statements",
+      "arn": "arn:aws:iam::111122223333:role/mixed-good-and-bad-statements",
+      "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          "a string where a statement object was expected",
+          {
+            "Sid": "GoodStatement",
+            "Effect": "Allow",
+            "Principal": { "AWS": "*" },
+            "Action": "sts:AssumeRole"
+          },
+          {
+            "Sid": "ConditionIsAString",
+            "Effect": "Allow",
+            "Principal": { "AWS": "arn:aws:iam::444455556666:root" },
+            "Action": "sts:AssumeRole",
+            "Condition": "sts:ExternalId=hunter2"
+          },
+          {
+            "Sid": "EffectIsWrong",
+            "Effect": "Permit",
+            "Principal": { "AWS": "arn:aws:iam::444455556666:root" },
+            "Action": "sts:AssumeRole"
+          },
+          {
+            "Sid": "NoPrincipal",
+            "Effect": "Allow",
+            "Action": "sts:AssumeRole"
+          }
+        ]
+      },
+      "inline_policies": [
+        {
+          "policy_name": "Secrets",
+          "policy_document": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": "secretsmanager:GetSecretValue",
+                "Resource": "*"
+              }
+            ]
+          }
+        }
+      ]
+    },
+
+    {
+      "_problem": "Unknown Principal key, wrong-case Principal key, non-string principal value, and a partially wildcarded principal ARN (which IAM does not support).",
+      "role_name": "odd-principal-forms",
+      "arn": "arn:aws:iam::111122223333:role/odd-principal-forms",
+      "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "Principal": {
+              "aws": "arn:aws:iam::444455556666:root",
+              "Robot": "beep.example.com",
+              "Service": ["ec2.amazonaws.com", 7],
+              "Federated": "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com"
+            },
+            "Action": "sts:AssumeRole",
+            "Condition": {
+              "StringEquals": {
+                "token.actions.githubusercontent.com:sub": {
+                  "nested": "objects are not valid condition values"
+                }
+              },
+              "NotAnOperator": "also not an object"
+            }
+          },
+          {
+            "Sid": "PartialWildcardPrincipal",
+            "Effect": "Allow",
+            "Principal": { "AWS": "arn:aws:iam::*:role/AnyDeployRole" },
+            "Action": "sts:AssumeRole"
+          }
+        ]
+      }
+    },
+
+    {
+      "_problem": "Uses NotPrincipal and NotAction, neither of which TrustEdge grades.",
+      "role_name": "not-principal-role",
+      "arn": "arn:aws:iam::111122223333:role/not-principal-role",
+      "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "NotPrincipal": { "AWS": "arn:aws:iam::111122223333:root" },
+            "NotAction": "sts:TagSession"
+          }
+        ]
+      }
+    },
+
+    {
+      "_problem": "Trust policy declares an unexpected Version.",
+      "role_name": "old-policy-version",
+      "arn": "arn:aws:iam::111122223333:role/old-policy-version",
+      "assume_role_policy_document": {
+        "Version": "2008-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "Principal": { "AWS": "arn:aws:iam::444455556666:root" },
+            "Action": "sts:AssumeRole"
+          }
+        ]
+      },
+      "attached_managed_policies": [
+        { "policy_arn": "arn:aws:iam::111122223333:policy/Broken" }
+      ]
+    },
+
+    {
+      "_problem": "No role_name and no parsable ARN: nothing to report against, must be skipped with an error.",
+      "path": "/"
+    },
+
+    "a bare string where a role object was expected",
+
+    {
+      "_problem": "Inline policies given as a map rather than a list, and one entry is unreadable.",
+      "role_name": "inline-policies-as-map",
+      "arn": "arn:aws:iam::111122223333:role/inline-policies-as-map",
+      "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": {
+          "Effect": "Allow",
+          "Principal": { "AWS": "*" },
+          "Action": "sts:AssumeRole",
+          "Condition": {
+            "StringEquals": { "aws:PrincipalOrgID": "o-exampleorgid" }
+          }
+        }
+      },
+      "inline_policies": {
+        "GoodOne": {
+          "Version": "2012-10-17",
+          "Statement": [
+            { "Effect": "Allow", "Action": "iam:PassRole", "Resource": "*" }
+          ]
+        },
+        "BadOne": 12345
+      }
+    },
+
+    {
+      "_problem": "Duplicate role name.",
+      "role_name": "inline-policies-as-map",
+      "arn": "arn:aws:iam::111122223333:role/inline-policies-as-map",
+      "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": []
+      }
+    }
+  ]
+}

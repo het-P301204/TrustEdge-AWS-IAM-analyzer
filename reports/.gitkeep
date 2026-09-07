@@ -1,0 +1,8 @@
+Generated reports land here.
+
+Nothing in this directory is committed (see .gitignore): a report quotes real
+role names and policy documents from whatever export it was built from, so it
+should not be published by accident.
+
+    trustedge analyze --input fixtures/sample-account.json \
+                      --output reports/sample-report.md

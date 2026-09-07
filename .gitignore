@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+build/
+dist/
+.eggs/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# ---------------------------------------------------------------------------
+# TrustEdge-specific: never commit real IAM state.
+#
+# An IAM authorisation export is a complete map of who can do what in an
+# account. The patterns below are deliberately broad: it is far better to have
+# to force-add a file than to publish an account's IAM state by accident.
+# Everything in fixtures/ is synthetic and is committed explicitly.
+# ---------------------------------------------------------------------------
+auth-details*.json
+authorization-details*.json
+*-authorization-details.json
+export.json
+*-export.json
+account-*.json
+iam-export*.json
+oidc-providers*.json
+saml-providers*.json
+
+# Generated reports may quote real role names and policy documents.
+reports/*
+!reports/.gitkeep
+
+# Credentials, in case a shell history or helper script wanders in
+.aws/
+credentials
+*.pem
+*.key
+*.p12
+*.pfx
+.env
+.env.*
+
+# The patterns above are deliberately broad, so they also catch the synthetic
+# fixtures the test suite depends on (malformed-export.json,
+# minimal-export.json, authorization-details-sample.json). Re-include them
+# explicitly: without this a fresh clone has no test inputs and pytest fails.
+# Everything under fixtures/ is invented data - see each file's _note.
+!fixtures/*.json

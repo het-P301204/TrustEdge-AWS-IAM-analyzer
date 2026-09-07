@@ -1,0 +1,912 @@
+{
+  "_note": [
+    "SYNTHETIC DATA. Every account id, role name, repository, certificate CN and",
+    "external ID in this file is invented for demonstration and testing. There are",
+    "no real credentials or secrets here, and this is not a real account's IAM",
+    "state. Account 111122223333 and 444455556666 are AWS documentation example",
+    "account ids.",
+    "",
+    "Policy documents named 'Synthetic*' are deliberately small stand-ins, not",
+    "copies of real AWS managed policies. AdministratorAccess is reproduced",
+    "faithfully because its real content is exactly Allow */*."
+  ],
+  "trustedge_export_version": "1",
+  "account_id": "111122223333",
+  "organization_id": "o-exampleorgid",
+  "generated_at": "2026-09-07T00:00:00Z",
+  "trusted_account_ids": ["222233334444"],
+
+  "vendor_accounts": {
+    "444455556666": {
+      "vendor": "Example Corp",
+      "notes": "Cost optimisation SaaS. Contract renewed 2026-01; owner: platform team.",
+      "requires_external_id": true
+    },
+    "555566667777": {
+      "vendor": "Northwind Observability",
+      "notes": "Log shipping. Contract status unconfirmed as of this export.",
+      "requires_external_id": true
+    }
+  },
+
+  "oidc_providers": [
+    {
+      "arn": "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com",
+      "url": "token.actions.githubusercontent.com",
+      "client_id_list": ["sts.amazonaws.com"],
+      "thumbprint_list": ["0000000000000000000000000000000000000000"]
+    },
+    {
+      "arn": "arn:aws:iam::111122223333:oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/EXAMPLED539D4633E53DE1B71EXAMPLE",
+      "url": "oidc.eks.us-east-1.amazonaws.com/id/EXAMPLED539D4633E53DE1B71EXAMPLE",
+      "client_id_list": ["sts.amazonaws.com"],
+      "thumbprint_list": ["0000000000000000000000000000000000000000"]
+    },
+    {
+      "arn": "arn:aws:iam::111122223333:oidc-provider/idp.internal.example.com",
+      "url": "https://idp.internal.example.com",
+      "client_id_list": ["aws-workloads"],
+      "thumbprint_list": ["0000000000000000000000000000000000000000"]
+    }
+  ],
+
+  "saml_providers": [
+    {
+      "arn": "arn:aws:iam::111122223333:saml-provider/CorpDirectory",
+      "name": "CorpDirectory"
+    }
+  ],
+
+  "managed_policies": [
+    {
+      "policy_arn": "arn:aws:iam::aws:policy/AdministratorAccess",
+      "policy_name": "AdministratorAccess",
+      "default_version_id": "v1",
+      "policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [{ "Effect": "Allow", "Action": "*", "Resource": "*" }]
+      }
+    },
+    {
+      "policy_arn": "arn:aws:iam::111122223333:policy/SyntheticReadOnly",
+      "policy_name": "SyntheticReadOnly",
+      "default_version_id": "v3",
+      "policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "ReadOnlySubset",
+            "Effect": "Allow",
+            "Action": [
+              "s3:GetObject",
+              "s3:ListBucket",
+              "ec2:Describe*",
+              "iam:Get*",
+              "iam:List*",
+              "rds:Describe*",
+              "cloudwatch:GetMetricData"
+            ],
+            "Resource": "*"
+          }
+        ]
+      }
+    },
+    {
+      "policy_arn": "arn:aws:iam::111122223333:policy/SyntheticDeployPipeline",
+      "policy_name": "SyntheticDeployPipeline",
+      "default_version_id": "v7",
+      "policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "PushArtifacts",
+            "Effect": "Allow",
+            "Action": ["s3:PutObject", "s3:GetObject"],
+            "Resource": "arn:aws:s3:::acme-build-artifacts/*"
+          },
+          {
+            "Sid": "PublishImages",
+            "Effect": "Allow",
+            "Action": [
+              "ecr:GetAuthorizationToken",
+              "ecr:BatchGetImage",
+              "ecr:PutImage",
+              "ecr:UploadLayerPart"
+            ],
+            "Resource": "*"
+          },
+          {
+            "Sid": "DeployTasks",
+            "Effect": "Allow",
+            "Action": ["ecs:RegisterTaskDefinition", "ecs:UpdateService"],
+            "Resource": "*"
+          },
+          {
+            "Sid": "PassTaskRoles",
+            "Effect": "Allow",
+            "Action": "iam:PassRole",
+            "Resource": "*"
+          }
+        ]
+      }
+    },
+    {
+      "policy_arn": "arn:aws:iam::111122223333:policy/SyntheticSecretsReader",
+      "policy_name": "SyntheticSecretsReader",
+      "default_version_id": "v2",
+      "policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "ReadSecrets",
+            "Effect": "Allow",
+            "Action": ["secretsmanager:GetSecretValue", "kms:Decrypt"],
+            "Resource": "*"
+          }
+        ]
+      }
+    },
+    {
+      "policy_arn": "arn:aws:iam::111122223333:policy/SyntheticLambdaLogs",
+      "policy_name": "SyntheticLambdaLogs",
+      "default_version_id": "v1",
+      "policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "Action": [
+              "logs:CreateLogGroup",
+              "logs:CreateLogStream",
+              "logs:PutLogEvents"
+            ],
+            "Resource": "arn:aws:logs:us-east-1:111122223333:log-group:/aws/lambda/*"
+          }
+        ]
+      }
+    }
+  ],
+
+  "roles": [
+    {
+      "_scenario": "1. Secure same-account role. Graded INTERNAL: not an inbound trust boundary.",
+      "role_name": "svc-internal-batch",
+      "arn": "arn:aws:iam::111122223333:role/svc-internal-batch",
+      "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "OnlyTheScheduler",
+            "Effect": "Allow",
+            "Principal": {
+              "AWS": "arn:aws:iam::111122223333:role/batch-scheduler"
+            },
+            "Action": "sts:AssumeRole"
+          }
+        ]
+      },
+      "attached_managed_policies": [
+        {
+          "policy_name": "SyntheticReadOnly",
+          "policy_arn": "arn:aws:iam::111122223333:policy/SyntheticReadOnly"
+        }
+      ]
+    },
+
+    {
+      "_scenario": "2. Broad cross-account trust: whole external account, no conditions, admin permissions.",
+      "role_name": "partner-broad-access",
+      "arn": "arn:aws:iam::111122223333:role/partner-broad-access",
+      "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "PartnerAccount",
+            "Effect": "Allow",
+            "Principal": { "AWS": "arn:aws:iam::444455556666:root" },
+            "Action": "sts:AssumeRole"
+          }
+        ]
+      },
+      "attached_managed_policies": [
+        {
+          "policy_name": "AdministratorAccess",
+          "policy_arn": "arn:aws:iam::aws:policy/AdministratorAccess"
+        }
+      ]
+    },
+
+    {
+      "_scenario": "3. Cross-account vendor trust with no sts:ExternalId (confused deputy exposure).",
+      "role_name": "vendor-cost-optimiser",
+      "arn": "arn:aws:iam::111122223333:role/vendor-cost-optimiser",
+      "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "ExampleCorpReadOnly",
+            "Effect": "Allow",
+            "Principal": { "AWS": "444455556666" },
+            "Action": "sts:AssumeRole"
+          }
+        ]
+      },
+      "attached_managed_policies": [
+        {
+          "policy_name": "SyntheticReadOnly",
+          "policy_arn": "arn:aws:iam::111122223333:policy/SyntheticReadOnly"
+        }
+      ]
+    },
+
+    {
+      "_scenario": "4. Cross-account trust whose sts:ExternalId is the customer's own account id - guessable.",
+      "role_name": "vendor-log-shipper",
+      "arn": "arn:aws:iam::111122223333:role/vendor-log-shipper",
+      "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "NorthwindWithWeakExternalId",
+            "Effect": "Allow",
+            "Principal": { "AWS": "arn:aws:iam::555566667777:root" },
+            "Action": "sts:AssumeRole",
+            "Condition": {
+              "StringEquals": { "sts:ExternalId": "111122223333" }
+            }
+          }
+        ]
+      },
+      "attached_managed_policies": [
+        {
+          "policy_name": "SyntheticDeployPipeline",
+          "policy_arn": "arn:aws:iam::111122223333:policy/SyntheticDeployPipeline"
+        }
+      ]
+    },
+
+    {
+      "_scenario": "5. Secure GitHub OIDC trust: repository and branch pinned with StringEquals.",
+      "role_name": "gh-deploy-payments-prod",
+      "arn": "arn:aws:iam::111122223333:role/gh-deploy-payments-prod",
+      "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "GitHubMainBranchOnly",
+            "Effect": "Allow",
+            "Principal": {
+              "Federated": "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com"
+            },
+            "Action": "sts:AssumeRoleWithWebIdentity",
+            "Condition": {
+              "StringEquals": {
+                "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+                "token.actions.githubusercontent.com:sub": "repo:acme-corp/payments-api:ref:refs/heads/main"
+              }
+            }
+          }
+        ]
+      },
+      "attached_managed_policies": [
+        {
+          "policy_name": "SyntheticDeployPipeline",
+          "policy_arn": "arn:aws:iam::111122223333:policy/SyntheticDeployPipeline"
+        }
+      ]
+    },
+
+    {
+      "_scenario": "6. GitHub OIDC trust with no sub condition at all - any org's workflow can assume.",
+      "role_name": "gh-legacy-admin",
+      "arn": "arn:aws:iam::111122223333:role/gh-legacy-admin",
+      "create_date": "2022-03-14T09:00:00Z",
+      "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "AudienceOnly",
+            "Effect": "Allow",
+            "Principal": {
+              "Federated": "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com"
+            },
+            "Action": "sts:AssumeRoleWithWebIdentity",
+            "Condition": {
+              "StringEquals": {
+                "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+              }
+            }
+          }
+        ]
+      },
+      "attached_managed_policies": [
+        {
+          "policy_name": "AdministratorAccess",
+          "policy_arn": "arn:aws:iam::aws:policy/AdministratorAccess"
+        }
+      ]
+    },
+
+    {
+      "_scenario": "7. GitHub OIDC org-wildcard trust: any repository in the org.",
+      "role_name": "gh-org-wide-secrets",
+      "arn": "arn:aws:iam::111122223333:role/gh-org-wide-secrets",
+      "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "AnyRepoInOrg",
+            "Effect": "Allow",
+            "Principal": {
+              "Federated": "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com"
+            },
+            "Action": "sts:AssumeRoleWithWebIdentity",
+            "Condition": {
+              "StringEquals": {
+                "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+              },
+              "StringLike": {
+                "token.actions.githubusercontent.com:sub": "repo:acme-corp/*"
+              }
+            }
+          }
+        ]
+      },
+      "attached_managed_policies": [
+        {
+          "policy_name": "SyntheticSecretsReader",
+          "policy_arn": "arn:aws:iam::111122223333:policy/SyntheticSecretsReader"
+        }
+      ]
+    },
+
+    {
+      "_scenario": "8. GitHub OIDC repository trust with no branch or environment restriction.",
+      "role_name": "gh-infra-any-branch",
+      "arn": "arn:aws:iam::111122223333:role/gh-infra-any-branch",
+      "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "AnyRefInRepo",
+            "Effect": "Allow",
+            "Principal": {
+              "Federated": "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com"
+            },
+            "Action": "sts:AssumeRoleWithWebIdentity",
+            "Condition": {
+              "StringEquals": {
+                "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+              },
+              "StringLike": {
+                "token.actions.githubusercontent.com:sub": "repo:acme-corp/infrastructure:*"
+              }
+            }
+          }
+        ]
+      },
+      "attached_managed_policies": [
+        {
+          "policy_name": "SyntheticDeployPipeline",
+          "policy_arn": "arn:aws:iam::111122223333:policy/SyntheticDeployPipeline"
+        }
+      ]
+    },
+
+    {
+      "_scenario": "9. GitHub OIDC with a weak subject pattern (wildcard inside the org segment) and an IfExists condition that enforces nothing.",
+      "role_name": "gh-legacy-subject-pattern",
+      "arn": "arn:aws:iam::111122223333:role/gh-legacy-subject-pattern",
+      "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "OrgPrefixWildcard",
+            "Effect": "Allow",
+            "Principal": {
+              "Federated": "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com"
+            },
+            "Action": "sts:AssumeRoleWithWebIdentity",
+            "Condition": {
+              "StringLike": {
+                "token.actions.githubusercontent.com:sub": "repo:acme-*/deploy-tools:*"
+              },
+              "StringEqualsIfExists": {
+                "token.actions.githubusercontent.com:environment": "production"
+              }
+            }
+          }
+        ]
+      },
+      "inline_policies": [
+        {
+          "policy_name": "RunAsAnyRole",
+          "policy_document": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Sid": "PassAndRun",
+                "Effect": "Allow",
+                "Action": ["iam:PassRole", "lambda:CreateFunction"],
+                "Resource": "*"
+              }
+            ]
+          }
+        }
+      ]
+    },
+
+    {
+      "_scenario": "10. AWS service trust with no confused-deputy restriction (aws:SourceAccount / aws:SourceArn absent).",
+      "role_name": "delivery-logs-writer",
+      "arn": "arn:aws:iam::111122223333:role/delivery-logs-writer",
+      "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "LogDeliveryService",
+            "Effect": "Allow",
+            "Principal": { "Service": "delivery.logs.amazonaws.com" },
+            "Action": "sts:AssumeRole"
+          }
+        ]
+      },
+      "inline_policies": [
+        {
+          "policy_name": "WriteDeliveryLogs",
+          "policy_document": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": "s3:PutObject",
+                "Resource": "arn:aws:s3:::acme-delivery-logs/*"
+              }
+            ]
+          }
+        }
+      ]
+    },
+
+    {
+      "_scenario": "11. Wildcard principal guarded only by a guessable external ID and a network condition.",
+      "role_name": "wildcard-integration",
+      "arn": "arn:aws:iam::111122223333:role/wildcard-integration",
+      "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "AnyoneWithTheString",
+            "Effect": "Allow",
+            "Principal": { "AWS": "*" },
+            "Action": "sts:AssumeRole",
+            "Condition": {
+              "StringEquals": { "sts:ExternalId": "secret" },
+              "IpAddress": { "aws:SourceIp": "0.0.0.0/0" }
+            }
+          }
+        ]
+      },
+      "attached_managed_policies": [
+        {
+          "policy_name": "SyntheticSecretsReader",
+          "policy_arn": "arn:aws:iam::111122223333:policy/SyntheticSecretsReader"
+        }
+      ]
+    },
+
+    {
+      "_scenario": "12. High blast radius via IAM control: CreatePolicyVersion, AttachRolePolicy and UpdateAssumeRolePolicy.",
+      "role_name": "iam-automation",
+      "arn": "arn:aws:iam::111122223333:role/iam-automation",
+      "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "PlatformRepoAnyRef",
+            "Effect": "Allow",
+            "Principal": {
+              "Federated": "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com"
+            },
+            "Action": "sts:AssumeRoleWithWebIdentity",
+            "Condition": {
+              "StringEquals": {
+                "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+              },
+              "StringLike": {
+                "token.actions.githubusercontent.com:sub": "repo:acme-corp/iam-as-code:*"
+              }
+            }
+          }
+        ]
+      },
+      "inline_policies": [
+        {
+          "policy_name": "ManageIamPolicies",
+          "policy_document": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Sid": "PolicyMutation",
+                "Effect": "Allow",
+                "Action": [
+                  "iam:CreatePolicyVersion",
+                  "iam:SetDefaultPolicyVersion",
+                  "iam:AttachRolePolicy",
+                  "iam:UpdateAssumeRolePolicy",
+                  "iam:CreateRole"
+                ],
+                "Resource": "*"
+              }
+            ]
+          }
+        }
+      ]
+    },
+
+    {
+      "_scenario": "16. Role chain potential: sts:AssumeRole onto every role in every account, behind SAML federation with only saml:aud.",
+      "role_name": "corp-sso-operator",
+      "arn": "arn:aws:iam::111122223333:role/corp-sso-operator",
+      "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "CorpDirectory",
+            "Effect": "Allow",
+            "Principal": {
+              "Federated": "arn:aws:iam::111122223333:saml-provider/CorpDirectory"
+            },
+            "Action": "sts:AssumeRoleWithSAML",
+            "Condition": {
+              "StringEquals": {
+                "SAML:aud": "https://signin.aws.amazon.com/saml"
+              }
+            }
+          }
+        ]
+      },
+      "inline_policies": [
+        {
+          "policy_name": "HopAnywhere",
+          "policy_document": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": "sts:AssumeRole",
+                "Resource": "arn:aws:iam::*:role/*"
+              }
+            ]
+          }
+        }
+      ]
+    },
+
+    {
+      "_scenario": "17. Multiple trust statements on one role, including one that grants no assume-role action.",
+      "role_name": "multi-door-artifacts",
+      "arn": "arn:aws:iam::111122223333:role/multi-door-artifacts",
+      "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "PinnedGitHubEnvironment",
+            "Effect": "Allow",
+            "Principal": {
+              "Federated": "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com"
+            },
+            "Action": "sts:AssumeRoleWithWebIdentity",
+            "Condition": {
+              "StringEquals": {
+                "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+                "token.actions.githubusercontent.com:sub": "repo:acme-corp/artifacts:environment:release",
+                "token.actions.githubusercontent.com:repository_owner_id": "987654321"
+              }
+            }
+          },
+          {
+            "Sid": "LegacyPartnerDoor",
+            "Effect": "Allow",
+            "Principal": { "AWS": "arn:aws:iam::444455556666:root" },
+            "Action": "sts:AssumeRole"
+          },
+          {
+            "Sid": "TagsOnly",
+            "Effect": "Allow",
+            "Principal": { "AWS": "arn:aws:iam::222233334444:root" },
+            "Action": "sts:TagSession"
+          }
+        ]
+      },
+      "attached_managed_policies": [
+        {
+          "policy_name": "SyntheticDeployPipeline",
+          "policy_arn": "arn:aws:iam::111122223333:policy/SyntheticDeployPipeline"
+        }
+      ]
+    },
+
+    {
+      "_scenario": "19. Strong trust policy, excessive permissions. Demonstrates that blast radius alone is not critical.",
+      "role_name": "partner-admin-pinned",
+      "arn": "arn:aws:iam::111122223333:role/partner-admin-pinned",
+      "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "OnePrincipalOneSecret",
+            "Effect": "Allow",
+            "Principal": {
+              "AWS": "arn:aws:iam::444455556666:role/ExampleCorpIntegration"
+            },
+            "Action": "sts:AssumeRole",
+            "Condition": {
+              "StringEquals": {
+                "sts:ExternalId": "EXAMPLE-3f9a2c7b14d8e05f6a",
+                "aws:PrincipalArn": "arn:aws:iam::444455556666:role/ExampleCorpIntegration"
+              }
+            }
+          }
+        ]
+      },
+      "attached_managed_policies": [
+        {
+          "policy_name": "AdministratorAccess",
+          "policy_arn": "arn:aws:iam::aws:policy/AdministratorAccess"
+        }
+      ]
+    },
+
+    {
+      "_scenario": "20. Broad trust, low permissions. Demonstrates that exposure alone is not critical.",
+      "role_name": "public-status-reader",
+      "arn": "arn:aws:iam::111122223333:role/public-status-reader",
+      "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "AnyoneAtAll",
+            "Effect": "Allow",
+            "Principal": "*",
+            "Action": "sts:AssumeRole"
+          }
+        ]
+      },
+      "inline_policies": [
+        {
+          "policy_name": "WhoAmI",
+          "policy_document": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": ["sts:GetCallerIdentity", "cloudwatch:GetMetricData"],
+                "Resource": "*"
+              }
+            ]
+          }
+        }
+      ]
+    },
+
+    {
+      "_scenario": "EKS IRSA, correctly scoped to one namespace and service account. Private issuer.",
+      "role_name": "irsa-payments-api",
+      "arn": "arn:aws:iam::111122223333:role/irsa-payments-api",
+      "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "OneServiceAccount",
+            "Effect": "Allow",
+            "Principal": {
+              "Federated": "arn:aws:iam::111122223333:oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/EXAMPLED539D4633E53DE1B71EXAMPLE"
+            },
+            "Action": "sts:AssumeRoleWithWebIdentity",
+            "Condition": {
+              "StringEquals": {
+                "oidc.eks.us-east-1.amazonaws.com/id/EXAMPLED539D4633E53DE1B71EXAMPLE:aud": "sts.amazonaws.com",
+                "oidc.eks.us-east-1.amazonaws.com/id/EXAMPLED539D4633E53DE1B71EXAMPLE:sub": "system:serviceaccount:payments:payments-api"
+              }
+            }
+          }
+        ]
+      },
+      "attached_managed_policies": [
+        {
+          "policy_name": "SyntheticSecretsReader",
+          "policy_arn": "arn:aws:iam::111122223333:policy/SyntheticSecretsReader"
+        }
+      ]
+    },
+
+    {
+      "_scenario": "EKS IRSA with a cluster-wide subject wildcard. Graded lower than the same omission on a shared issuer, because the issuer belongs to one cluster.",
+      "role_name": "irsa-cluster-wide",
+      "arn": "arn:aws:iam::111122223333:role/irsa-cluster-wide",
+      "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "AnyServiceAccount",
+            "Effect": "Allow",
+            "Principal": {
+              "Federated": "arn:aws:iam::111122223333:oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/EXAMPLED539D4633E53DE1B71EXAMPLE"
+            },
+            "Action": "sts:AssumeRoleWithWebIdentity",
+            "Condition": {
+              "StringLike": {
+                "oidc.eks.us-east-1.amazonaws.com/id/EXAMPLED539D4633E53DE1B71EXAMPLE:sub": "system:serviceaccount:*:*"
+              }
+            }
+          }
+        ]
+      },
+      "attached_managed_policies": [
+        {
+          "policy_name": "SyntheticSecretsReader",
+          "policy_arn": "arn:aws:iam::111122223333:policy/SyntheticSecretsReader"
+        }
+      ]
+    },
+
+    {
+      "_scenario": "IAM Roles Anywhere with no trust-anchor and no certificate condition.",
+      "role_name": "rolesanywhere-build-agent",
+      "arn": "arn:aws:iam::111122223333:role/rolesanywhere-build-agent",
+      "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "AnyCertificate",
+            "Effect": "Allow",
+            "Principal": { "Service": "rolesanywhere.amazonaws.com" },
+            "Action": ["sts:AssumeRole", "sts:TagSession", "sts:SetSourceIdentity"]
+          }
+        ]
+      },
+      "attached_managed_policies": [
+        {
+          "policy_name": "SyntheticDeployPipeline",
+          "policy_arn": "arn:aws:iam::111122223333:policy/SyntheticDeployPipeline"
+        }
+      ]
+    },
+
+    {
+      "_scenario": "IAM Roles Anywhere, correctly pinned to a trust anchor and a certificate common name.",
+      "role_name": "rolesanywhere-pinned",
+      "arn": "arn:aws:iam::111122223333:role/rolesanywhere-pinned",
+      "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "PinnedAnchorAndCn",
+            "Effect": "Allow",
+            "Principal": { "Service": "rolesanywhere.amazonaws.com" },
+            "Action": ["sts:AssumeRole", "sts:TagSession", "sts:SetSourceIdentity"],
+            "Condition": {
+              "ArnEquals": {
+                "aws:SourceArn": "arn:aws:rolesanywhere:us-east-1:111122223333:trust-anchor/11111111-2222-3333-4444-555555555555"
+              },
+              "StringEquals": {
+                "aws:PrincipalTag/x509Subject/CN": "build-agent-01"
+              }
+            }
+          }
+        ]
+      },
+      "attached_managed_policies": [
+        {
+          "policy_name": "SyntheticReadOnly",
+          "policy_arn": "arn:aws:iam::111122223333:policy/SyntheticReadOnly"
+        }
+      ]
+    },
+
+    {
+      "_scenario": "Compute-attachment service principal. Graded INTERNAL to avoid reporting a missing confused-deputy condition on every Lambda role in the account.",
+      "role_name": "lambda-report-generator",
+      "arn": "arn:aws:iam::111122223333:role/lambda-report-generator",
+      "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "Principal": { "Service": "lambda.amazonaws.com" },
+            "Action": "sts:AssumeRole"
+          }
+        ]
+      },
+      "attached_managed_policies": [
+        {
+          "policy_name": "SyntheticLambdaLogs",
+          "policy_arn": "arn:aws:iam::111122223333:policy/SyntheticLambdaLogs"
+        }
+      ]
+    },
+
+    {
+      "_scenario": "Attached managed policy whose document is absent from the export: blast radius is UNKNOWN, not LOW.",
+      "role_name": "vendor-unresolved-permissions",
+      "arn": "arn:aws:iam::111122223333:role/vendor-unresolved-permissions",
+      "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "Principal": { "AWS": "arn:aws:iam::444455556666:root" },
+            "Action": "sts:AssumeRole"
+          }
+        ]
+      },
+      "attached_managed_policies": [
+        {
+          "policy_name": "PolicyNotIncludedInExport",
+          "policy_arn": "arn:aws:iam::111122223333:policy/PolicyNotIncludedInExport"
+        }
+      ]
+    },
+
+    {
+      "_scenario": "Fail-closed defect: StringEquals does not interpret '*', so this condition can never match a real token.",
+      "role_name": "gh-broken-exact-match",
+      "arn": "arn:aws:iam::111122223333:role/gh-broken-exact-match",
+      "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "WildcardUnderExactOperator",
+            "Effect": "Allow",
+            "Principal": {
+              "Federated": "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com"
+            },
+            "Action": "sts:AssumeRoleWithWebIdentity",
+            "Condition": {
+              "StringEquals": {
+                "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+                "token.actions.githubusercontent.com:sub": "repo:acme-corp/*"
+              }
+            }
+          }
+        ]
+      },
+      "attached_managed_policies": [
+        {
+          "policy_name": "SyntheticReadOnly",
+          "policy_arn": "arn:aws:iam::111122223333:policy/SyntheticReadOnly"
+        }
+      ]
+    },
+
+    {
+      "_scenario": "Private OIDC issuer with no subject condition. Bounded by who the IdP will authenticate, which TrustEdge cannot see.",
+      "role_name": "internal-idp-workload",
+      "arn": "arn:aws:iam::111122223333:role/internal-idp-workload",
+      "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "Principal": {
+              "Federated": "arn:aws:iam::111122223333:oidc-provider/idp.internal.example.com"
+            },
+            "Action": "sts:AssumeRoleWithWebIdentity",
+            "Condition": {
+              "StringEquals": {
+                "idp.internal.example.com:aud": "aws-workloads"
+              }
+            }
+          }
+        ]
+      },
+      "attached_managed_policies": [
+        {
+          "policy_name": "SyntheticReadOnly",
+          "policy_arn": "arn:aws:iam::111122223333:policy/SyntheticReadOnly"
+        }
+      ]
+    }
+  ]
+}

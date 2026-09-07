@@ -1,0 +1,58 @@
+# TrustEdge local viewer.
+#
+#   docker compose up            # then open http://127.0.0.1:8765
+#   docker compose run --rm analyze -i /work/fixtures/sample-account.json
+#
+# Note on the bind address: inside the container the server must listen on
+# 0.0.0.0 for Docker's port mapping to reach it, so TrustEdge prints its
+# "binding beyond this machine" warning. The `ports` mapping below publishes it
+# on 127.0.0.1 only, so the container's 0.0.0.0 is confined to the container's
+# own network namespace and the viewer is not reachable from your LAN. If you
+# change `127.0.0.1:8765:8765` to `8765:8765` you are publishing an
+# unauthenticated view of your IAM state - don't.
+
+services:
+  viewer:
+    build: .
+    image: trustedge:local
+    command: ["serve", "--host", "0.0.0.0", "--port", "8765"]
+    ports:
+      - "127.0.0.1:8765:8765"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import sys, urllib.request
+          body = urllib.request.urlopen("http://127.0.0.1:8765/healthz", timeout=3).read()
+          sys.exit(0 if b'"ok": true' in body else 1)
+      interval: 30s
+      timeout: 5s
+      start_period: 5s
+      retries: 3
+
+  # One-shot analysis of an export on the host. `docker compose run` overrides
+  # the command, so:
+  #   docker compose run --rm analyze -i /work/fixtures/sample-account.json \
+  #                                   -o /work/reports/report.md
+  analyze:
+    build: .
+    image: trustedge:local
+    # No egress: the analyser has no network code and does not need any.
+    network_mode: none
+    volumes:
+      - ./:/work
+    working_dir: /work
+    command: ["--help"]
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
